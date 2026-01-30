@@ -1,5 +1,5 @@
-import { PDFDocument } from 'pdf-lib';
 import { NextResponse } from 'next/server';
+import init from 'qpdf-wasm';
 
 export async function POST(req) {
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB limit
@@ -22,24 +22,42 @@ export async function POST(req) {
         }
 
         const arrayBuffer = await file.arrayBuffer();
-        const pdf = await PDFDocument.load(arrayBuffer);
+        const inputData = new Uint8Array(arrayBuffer);
 
-        // Note: pdf-lib doesn't support encryption natively in the base version.
-        // We set metadata as a placeholder and return the original to maintain the flow.
-        // In a production environment with encryption requirements, a library like qpdf or similar would be used on the server.
-        pdf.setTitle('Protected Document');
+        // Initialize qpdf-wasm
+        const qpdf = await init();
 
-        const pdfBytes = await pdf.save();
+        // Write file to virtual FS
+        qpdf.FS.writeFile('input.pdf', inputData);
 
-        return new Response(pdfBytes, {
+        // Run qpdf to encrypt
+        // Command: qpdf input.pdf output.pdf --encrypt user-password owner-password 256 --
+        qpdf.callMain([
+            'input.pdf',
+            'output.pdf',
+            '--encrypt',
+            password,
+            password,
+            '256',
+            '--'
+        ]);
+
+        // Read the result
+        const outputData = qpdf.FS.readFile('output.pdf');
+
+        // Clean up virtual FS
+        qpdf.FS.unlink('input.pdf');
+        qpdf.FS.unlink('output.pdf');
+
+        return new Response(outputData, {
             status: 200,
             headers: {
                 'Content-Type': 'application/pdf',
-                'Content-Disposition': 'attachment; filename="protected_placeholder.pdf"',
+                'Content-Disposition': 'attachment; filename="protected.pdf"',
             },
         });
     } catch (error) {
         console.error('Error locking PDF:', error);
-        return NextResponse.json({ error: 'Failed to process PDF' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to process PDF. Make sure it isn\'t already protected.' }, { status: 500 });
     }
 }
