@@ -60,7 +60,7 @@ const MergePDF = () => {
     return (
         <div className="tool-page">
             <div className="primary-action-card">
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '-10px', textAlign: 'center', fontWeight: 500 }}>
+                <p style={{ fontSize: '18px', color: 'var(--text-muted)', marginBottom: '10px', textAlign: 'center', fontWeight: 500 }}>
                     Combine multiple PDF files into a single document instantly.
                 </p>
 

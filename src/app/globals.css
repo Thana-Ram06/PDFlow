@@ -90,6 +90,8 @@ h4 {
     align-items: center;
     justify-content: space-between;
     width: 100%;
+    max-width: 1024px;
+    margin: 0 auto;
     padding: 0 24px;
 }
 
@@ -315,10 +317,16 @@ h4 {
         font-size: 2rem !important;
     }
 }
+
 /* Animations */
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .animate-spin {

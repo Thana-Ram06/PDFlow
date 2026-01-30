@@ -56,7 +56,7 @@ const WritePDF = () => {
     return (
         <div className="tool-page">
             <div className="primary-action-card">
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '-10px', textAlign: 'center', fontWeight: 500 }}>
+                <p style={{ fontSize: '18px', color: 'var(--text-muted)', marginBottom: '10px', textAlign: 'center', fontWeight: 500 }}>
                     Create professional PDF documents with live formatting.
                 </p>
 

@@ -25,29 +25,54 @@ export async function POST(req) {
         const inputData = new Uint8Array(arrayBuffer);
 
         // Initialize qpdf-wasm
-        const qpdf = await init();
+        // Note: qpdf-wasm init might fail in some environments if it can't find the .wasm file
+        let qpdf;
+        try {
+            qpdf = await init();
+        } catch (initError) {
+            console.error('qpdf init error:', initError);
+            throw new Error('Failed to initialize PDF engine');
+        }
 
         // Write file to virtual FS
         qpdf.FS.writeFile('input.pdf', inputData);
 
         // Run qpdf to encrypt
-        // Command: qpdf input.pdf output.pdf --encrypt user-password owner-password 256 --
-        qpdf.callMain([
-            'input.pdf',
-            'output.pdf',
-            '--encrypt',
-            password,
-            password,
-            '256',
-            '--'
-        ]);
+        try {
+            // Command: qpdf input.pdf output.pdf --encrypt user-password owner-password 256 --
+            qpdf.callMain([
+                'input.pdf',
+                'output.pdf',
+                '--encrypt',
+                password,
+                password,
+                '256',
+                '--'
+            ]);
+        } catch (cmdError) {
+            console.error('qpdf command error:', cmdError);
+            // Even if it throws, it might have finished part of the work, but usually it means failure
+            if (!qpdf.FS.analyzePath('output.pdf').exists) {
+                throw new Error('Encryption failed. Is the PDF already password protected?');
+            }
+        }
 
         // Read the result
-        const outputData = qpdf.FS.readFile('output.pdf');
+        let outputData;
+        try {
+            outputData = qpdf.FS.readFile('output.pdf');
+        } catch (readError) {
+            console.error('qpdf read error:', readError);
+            throw new Error('Failed to read protected PDF');
+        }
 
         // Clean up virtual FS
-        qpdf.FS.unlink('input.pdf');
-        qpdf.FS.unlink('output.pdf');
+        try {
+            qpdf.FS.unlink('input.pdf');
+            qpdf.FS.unlink('output.pdf');
+        } catch (cleanupError) {
+            console.warn('qpdf cleanup warning:', cleanupError);
+        }
 
         return new Response(outputData, {
             status: 200,
@@ -57,7 +82,7 @@ export async function POST(req) {
             },
         });
     } catch (error) {
-        console.error('Error locking PDF:', error);
-        return NextResponse.json({ error: 'Failed to process PDF. Make sure it isn\'t already protected.' }, { status: 500 });
+        console.error('Detailed error locking PDF:', error);
+        return NextResponse.json({ error: error.message || 'Failed to process PDF' }, { status: 500 });
     }
 }
