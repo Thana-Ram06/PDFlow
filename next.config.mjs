@@ -1,6 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    /* config options here */
+    webpack: (config, { isServer }) => {
+        if (isServer) {
+            config.experiments = {
+                ...config.experiments,
+                topLevelAwait: true,
+                layers: true,
+            };
+        }
+        return config;
+    },
 };
 
 export default nextConfig;

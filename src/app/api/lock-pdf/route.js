@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import init from 'qpdf-wasm';
+import path from 'path';
+import fs from 'fs';
 
 export async function POST(req) {
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB limit
@@ -24,14 +26,22 @@ export async function POST(req) {
         const arrayBuffer = await file.arrayBuffer();
         const inputData = new Uint8Array(arrayBuffer);
 
-        // Initialize qpdf-wasm
-        // Note: qpdf-wasm init might fail in some environments if it can't find the .wasm file
+        // Find the wasm path - handle different runtime environments
+        const wasmPath = path.join(process.cwd(), 'node_modules', 'qpdf-wasm', 'qpdf.wasm');
+
         let qpdf;
         try {
-            qpdf = await init();
+            if (fs.existsSync(wasmPath)) {
+                console.log('Using local WASM binary');
+                const wasmBinary = fs.readFileSync(wasmPath);
+                qpdf = await init({ wasmBinary });
+            } else {
+                console.log('Locating WASM engine...');
+                qpdf = await init();
+            }
         } catch (initError) {
             console.error('qpdf init error:', initError);
-            throw new Error('Failed to initialize PDF engine');
+            throw new Error('Failed to initialize PDF protection engine. If you are on Vercel, please wait for the next deployment update.');
         }
 
         // Write file to virtual FS
@@ -39,7 +49,6 @@ export async function POST(req) {
 
         // Run qpdf to encrypt
         try {
-            // Command: qpdf input.pdf output.pdf --encrypt user-password owner-password 256 --
             qpdf.callMain([
                 'input.pdf',
                 'output.pdf',
@@ -51,9 +60,8 @@ export async function POST(req) {
             ]);
         } catch (cmdError) {
             console.error('qpdf command error:', cmdError);
-            // Even if it throws, it might have finished part of the work, but usually it means failure
             if (!qpdf.FS.analyzePath('output.pdf').exists) {
-                throw new Error('Encryption failed. Is the PDF already password protected?');
+                throw new Error('Encryption failed. This PDF might already be protected or have restricted permissions.');
             }
         }
 
@@ -63,7 +71,7 @@ export async function POST(req) {
             outputData = qpdf.FS.readFile('output.pdf');
         } catch (readError) {
             console.error('qpdf read error:', readError);
-            throw new Error('Failed to read protected PDF');
+            throw new Error('Failed to generate output PDF');
         }
 
         // Clean up virtual FS
@@ -83,6 +91,8 @@ export async function POST(req) {
         });
     } catch (error) {
         console.error('Detailed error locking PDF:', error);
-        return NextResponse.json({ error: error.message || 'Failed to process PDF' }, { status: 500 });
+        return NextResponse.json({
+            error: error.message || 'Failed to process PDF',
+        }, { status: 500 });
     }
 }
